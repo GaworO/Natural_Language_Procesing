@@ -1,0 +1,1388 @@
+---
+title: "Women's E-Commerce Clothing Reviews"
+author: "Aleksandra Gawor  , Mikolaj Gronowski"
+date: "5 stycznia 2019"
+---
+
+
+```{r , echo=FALSE , message=FALSE , warning=FALSE}
+setwd("C:\\Users\\Ola\\Desktop\\ML2_projekt")
+```
+
+
+```{r setup, include=FALSE ,echo=FALSE , message=FALSE , warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# install.packages("tmap")
+# install.packages("extrafont")
+# install.packages("ggthemes")
+# install.packages("grid")
+# install.packages("kableExtra")
+# install.packages("glue")
+# devtools::install_github("haozhu233/kableExtra")
+#  install.packages("outliers")
+#  install.packages("wesanderson")
+#  install.packages("gridExtra")
+# install.packages("tidyverse")
+# install.packages('http://s3-us-west-2.amazonaws.com/10x.files/code/cellrangerRkit-1.1.0.tar.gz', repos=NULL)
+# install.packages('RMySQL', repos='http://cran.us.r-project.org')
+# install.packages("sentimentr")
+library(kableExtra)
+library(RMySQL)
+library(plyr)
+library(ROCR)
+library(randomForest)
+library(ranger) 
+library(neuralnet)
+library(syuzhet)
+library(rmarkdown)
+library(dplyr)
+library(ggthemes)
+library(RColorBrewer)
+library(stringr)
+library(ggExtra)
+library(grid)
+library(extrafont)
+library(tm)
+library(dplyr)
+library(corrplot)
+library(sentimentr)
+library(stringi)
+library(tmap)
+library(wordcloud2)
+library(rattle)
+library(ggplot2)  
+library(caret)
+library(reshape2)
+library(dplyr)
+library(tidyverse)
+library(tidytext)
+library(stringr)
+library(dplyr)
+library(ggplot2)
+library(ngramrr)
+library(reshape)
+library(tm)
+library(wordcloud)
+library(reshape2)
+library(quanteda)
+library(knitr)
+library(ggplot2)
+library(sentimentr)
+library(magrittr)
+library(dummies)
+library(MASS)
+library(tree)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+
+```
+```{r }
+knitr::opts_chunk$set(echo = TRUE)
+
+dat2 <- read.csv("Womens.csv", header=T, na.strings=c(""," ","NA"))
+
+```
+
+# Introduction 
+
+This dataset includes 23486 rows and 10 feature variables. Each row corresponds to a customer review, and includes variables:
+
+Clothing ID: Integer variable that refers to the specific piece being reviewed.
+Age: Integer variable of the reviewers age.
+Title: String variable for the title of the review.
+Title Text: String variable for the review body.
+Rating: Integer variable for the product score granted by the customer from 1 Worst, to 5 Best.
+Recommended IND: Binary variable stating where the customer recommends the product where 1 is recommended, 0 is not recommended.
+Positive Feedback Count: Integer documenting the number of other customers who found this review positive.
+Division Name: Categorical, name of the product high level division.
+Department Name: Categorical, name of the product department name.
+Class Name: Categorical, name of the product class name.
+
+source : https://www.kaggle.com/nicapotato/womens-ecommerce-clothing-reviews/home
+
+
+In our data set we will try to explore trends in the customer reviews from an anonymized women clothing E-commerce platform.
+
+# 1 - Looking into data set
+
+
+First step is to clean our data set and look if there are any empty cells. 
+
+```{r echo=FALSE , results='asis' , message=FALSE}
+missing.values <- sum(is.na(dat2))
+data.full <- dat2[complete.cases(dat2),]
+kable(head(data.full,1) , caption = "View of the first row of table")
+  
+```
+
+There are 4697 empty cells. In these step we get rid of them.
+After first cleaning in our dataset we have 19662 observations and 11 variables 
+
+
+# 2 - Distributon of individual variables 
+
+```{r}
+list = c("Clothing.ID","Age" , "Rating" , "Recommended.IND" ,"Positive.Feedback.Count")
+summary(data.full[list])
+
+```
+
+
+Looking threw our summary we can see that the biggest median is in the variables age and Clothing ID. This result is resonable becouse those 2 variables have big numbers in their column. Clothing ID numbers can have values even to a number over a thousand and Age value can also have a big values. Both of those columns represent continous variables.
+
+In this part the focus will be on the values that are represented by numbers.
+
+We look deeper into data to see what is going inside. 
+
+#Densities
+
+We looked into densities of two values that made sense the most to look into. 
+First one was Age, we wanted to see how the density of age of our customers look like. 
+From the graph we can see that the biggest value is near the age of 35.
+This means customers in that age are our biggest target. 
+
+
+```{r pressure, echo=FALSE , message=FALSE , warning=FALSE}
+age.density <-ggplot(data.full, aes(x=Age)) + 
+  geom_histogram(aes(y=..density..), colour="black", fill="#19a5a8")+
+  geom_density(alpha=.2, fill="white") +
+  ggtitle("Density of age") +
+  ylab("Density") +
+  theme_economist() +
+  theme(legend.position = "bottom", legend.direction = "horizontal",
+        legend.box = "horizontal",
+        legend.key.size = unit(1, "cm"),
+        axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.title = element_text(size = 12),
+        legend.text = element_text(size = 9),
+        legend.title=element_text(face = "bold", size = 9))
+
+age.density
+```
+
+Second density to look closer to was Positive Feedback Count. We wanted to see how the denisty of positive feedbacks looked like. 
+We represented this variable as a logarithm.
+As we can see the biggest number on a density plot is near zero. 
+Which means that not that many people might have left a positive feedback.
+
+
+```{r , echo=FALSE , message=FALSE }
+positive.feedback.count <-ggplot(data.full, aes(x=log(Positive.Feedback.Count))) + 
+  geom_histogram(aes(y=..density..), colour="black", fill="#19a5a8")+
+  geom_density(alpha=.2, fill="white") +
+  ggtitle("Density of Positve Feedback Count") +
+  ylab("Density") +
+  xlab("Logarithm of Positive Feedback Count") +
+  theme_economist() +
+  theme(legend.position = "bottom", legend.direction = "horizontal",
+        legend.box = "horizontal",
+        legend.key.size = unit(1, "cm"),
+        axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.title = element_text(size = 12),
+        legend.text = element_text(size = 9),
+        legend.title=element_text(face = "bold", size = 9))
+
+positive.feedback.count
+```
+
+To look into other numberic variables we used bar graphs to see how the data looks like. 
+
+##Recomendation of a product 
+
+In the graph below we can see that most of the customers 81% recomended the product and 18% didn't.
+Since it is our depended variable we can see that our data is unbalanced. 
+
+
+```{r , echo=FALSE , message=FALSE}
+recomended.bar_graph <- ggplot(data.full , aes(x=Recommended.IND) )+
+   geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+  geom_text(aes( label = scales::percent(..prop..),
+                 y= ..prop.. ), stat= "count",vjust = -.2,size = 4) +
+  ggtitle("Was the product recomended ?" ) +
+  scale_x_continuous(breaks=c(0:1)) +
+  scale_y_continuous(breaks = seq(0, 15000, by = 3000)) +
+  xlab("Recomended") +
+  ylab(" ") +
+  theme_economist() +
+  theme(legend.position = "none", 
+        legend.key.size = unit(1, "cm"),
+        axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.title = element_text(size = 12),
+        legend.text = element_text(size = 9),
+        legend.title=element_text(face = "bold", size = 9))
+
+  recomended.bar_graph2 <- recomended.bar_graph + scale_fill_brewer(palette="Set1")
+  recomended.bar_graph2
+  
+  
+```
+
+Next variable we looked more closely to is Rating. This is a categorical variable which can be scored from values 1 to 5. 
+On the graph we can see that the biggest bar is on the number 5, so 55% of people which left the rating rated the prodcut with the highest possible values.
+
+
+```{r ,echo=FALSE  , message=FALSE , warning=FALSE}
+
+rating.bargraph <-  ggplot(data.full, aes(x= Rating)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+  geom_text(aes( label = scales::percent(..prop..),
+                 y= ..prop.. ), stat= "count", vjust = -.5) +
+  guides(fill=FALSE) +
+  xlab("Rating") +
+  ylab(label = '')+
+  theme_economist() +
+  ggtitle("Percentage values of choosen ranking value") +
+  theme(
+    axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.text.y=element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_text(size = 12)) 
+ 
+rating.bargraph1 <- rating.bargraph + scale_fill_brewer(palette="Set1")
+rating.bargraph1
+
+```
+
+
+#Divison Name 
+
+Next variable shows that the biggest number of items is in the section General.
+
+```{r , echo=FALSE , message=FALSE , warning=FALSE}
+division.name <-  ggplot(data.full, aes(x= Division.Name)) + 
+   geom_bar(aes(y = ..count.., fill = factor(..x..)), stat="count") +
+   geom_text(stat='count', aes(label=..count..), vjust=-0.5 ,size = 4) +
+   guides(fill=FALSE) +
+   xlab("Division Name") +
+   ylab(" ") + 
+   ggtitle("Count of products in each division") +
+   theme_economist() +
+   theme(
+        axis.title.x = element_text(face = "bold", size = 12) ,
+         axis.title.y = element_text(face = "bold", size = 12) ,
+         axis.text.y=element_blank(),
+         axis.ticks = element_blank(),
+         axis.title = element_text(size = 12)) 
+ 
+p1 <- division.name +scale_fill_brewer(palette="Dark2")
+p1
+
+```
+
+
+#Departament Name 
+
+To look closer into the products , we counted which of the product has the most occurances in our database. The most visible product was Tops with 8715 occurances.
+
+```{r , echo=FALSE,message=FALSE , warning=FALSE}
+ 
+  departament.name <-  ggplot(data.full, aes(x= Department.Name)) + 
+   geom_bar(aes(y = ..count.., fill = factor(..x..)), stat="count") +
+   geom_text(stat='count', aes(label=..count..), vjust=-1 , size = 4) +
+   guides(fill=FALSE) +
+   xlab("Products") +
+   ylab(" ") + 
+   ggtitle("Count of products in departaments") +
+   theme_economist() +
+   theme(
+         axis.title.x = element_text(face = "bold", size = 12) ,
+         axis.title.y = element_text(face = "bold", size = 12) ,
+         axis.ticks = element_blank(),
+         axis.text.y=element_blank(),
+         axis.title = element_text(size = 12))  
+   
+p2 <- departament.name +  scale_fill_brewer(palette="Spectral")
+p2
+ 
+```
+
+#Class Name 
+
+We also wanted to know the count of each of the products. 
+The biggest one was Dresses. 
+
+```{r , echo=FALSE  ,message=FALSE , warning=FALSE}
+class.name <-  ggplot(data.full, aes(x= Class.Name)) + 
+   geom_bar(aes(y = ..count.., fill = factor(..x..)), stat="count") +
+   geom_text(stat='count', aes(label=..count..), vjust=-1 ,size = 4) +
+   guides(fill=FALSE) +
+   xlab("All products") +
+   ylab(" ") + 
+   ggtitle("Count of each product") +
+   theme_economist() +
+   theme(
+         axis.title.x = element_text(face = "bold", size = 12) ,
+         axis.title.y = element_text(face = "bold", size = 12) ,
+         axis.text.y=element_blank(),
+         axis.ticks = element_blank(),
+         axis.text.x = element_text(size=7),
+         axis.title = element_text(size = 12)) 
+ 
+p3 <- class.name +  scale_fill_manual(values = c('#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000'))
+p3
+ 
+```
+
+#Product popularity
+
+It was also important to see which of the products had the biggest popularity.
+Products with id 1087 , 862 and 1094 have the biggest popularity in the whole database. We can see in the table that the most popular product have occured in our database 871 times.
+
+```{r , echo=FALSE  , message=FALSE , warning=FALSE}
+c <- as.data.frame(sort(table(data.full$Clothing.ID),decreasing=TRUE)[1:10])
+colnames(c) <- c("Number of an item", "Occuances of an item")
+
+kable(c) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F) %>%
+  column_spec(1:2, bold = T) %>%
+  row_spec(0, color = "black") %>%
+  row_spec(1:3, bold = T, color = "white", background = "#D7261E")
+```
+
+
+# 3 - Multivariative Distibution 
+
+Next step was to look into variables and see if there are any coorelations between them. 
+
+
+# Categorical Variables
+
+First variables where : Division Name and Departament Name. 
+
+```{r , echo=FALSE  ,message=FALSE , warning=FALSE}
+
+myTable <- as.data.frame(table(data.full$Division.Name , data.full$Department.Name))
+colnames(myTable) <- c("Division Name" , "Departament Name" , "Frequency")
+myTable
+heat.map <- ggplot(data = myTable, mapping = aes(x = `Division Name`,
+                                     y = `Departament Name`,
+                                     fill = Frequency )) + 
+  geom_tile(aes(fill = Frequency)) + 
+  theme_bw() + 
+  geom_text(aes(label = Frequency), size = 3, hjust = 1, vjust = 0,colour="white")  +
+  xlab(label = "Division Name") +
+  ylab("Departament Name") +
+  theme_economist() +
+  theme(legend.position = "none", 
+        legend.box = "right",
+        legend.key.size = unit(1, "cm"),
+        axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.title = element_text(size = 12),
+        legend.text = element_text(size = 9),
+        legend.title=element_text(face = "bold", size = 9)) 
+l1 <- heat.map + scale_fill_gradient(low = "#a5d2ef", high = "#ff599c")
+
+```
+
+As we can see the biggest heat is between Tops in the section General. From the heatmap we can assume that in section General there are the biggest occurances of Tops and Dresses. In case of section General Petite the situation is exactlly the same. 
+
+It was also important to see the percentage distribution of the same variables. 
+
+```{r ,echo=FALSE , message=FALSE , warning=FALSE}
+sum.all <- sum(myTable$Frequency)
+per <- as.data.frame(round((myTable$Frequency/sum.all) * 100 ) )
+myTable2 <- cbind(myTable, per )
+library(plyr)
+myTable3 <- rename(myTable2, c("round((myTable$Frequency/sum.all) * 100)"="Percentages"))
+
+heat.map.percentages <- ggplot(data = myTable3, mapping = aes(x = `Division Name`,
+                                                 y = `Departament Name`,
+                                                 fill = Percentages )) + 
+  geom_tile(aes(fill = Percentages)) + 
+  theme_bw() + 
+  geom_text(aes(label = Percentages), size = 3, hjust = 1, vjust = 0,colour="white")  +
+  xlab(label = "Division Name") +
+  ylab("Departament Name") +
+  theme_economist() +
+  theme(legend.position = "right", 
+        legend.box = "right",
+        legend.key.size = unit(1, "cm"),
+        axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.title = element_text(size = 12),
+        legend.text = element_text(size = 9),
+        legend.title=element_text(face = "bold", size = 9)) 
+l2 <- heat.map.percentages + scale_fill_gradient(low = "#a5d2ef", high = "#a37aa5")
+
+```
+
+```{r , echo=FALSE  ,message=FALSE , warning=FALSE}
+library(gridExtra)
+grid.arrange(l1, l2, ncol=2, clip=TRUE)
+
+```
+
+
+The same action was done between variables Class Name and Departament Name. 
+
+```{r ,echo=FALSE , message=FALSE , warning=FALSE}
+myTable.className.departamentName <- as.data.frame(table(data.full$Class.Name , data.full$Department.Name))
+colnames(myTable.className.departamentName) <- c("Class Name" , "Departament Name" , "Frequency")
+
+heat.map.className.departamentName <- ggplot(data = myTable.className.departamentName, mapping = aes(x = `Departament Name`,
+                                                 y = `Class Name`,
+                                                 fill = Frequency )) + 
+  geom_tile(aes(fill = Frequency)) + 
+  theme_bw() + 
+  geom_text(aes(label = Frequency), size = 3, hjust = 0, vjust = 0,colour="white")  +
+  xlab(label = "Departament Name") +
+  ylab("Class Name") +
+  theme_economist() +
+  theme(legend.position = "none", 
+        legend.box = "right",
+        legend.key.size = unit(1, "cm"),
+        axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.title = element_text(size = 12),
+        legend.text = element_text(size = 9),
+        legend.title=element_text(face = "bold", size = 9)) +
+  scale_fill_gradient2(low = "white", mid = "#6dc3c4", high = "#f69454")
+
+
+```
+
+
+
+```{r ,echo=FALSE , message=FALSE , warning=FALSE}
+sum.all1 <- sum(myTable.className.departamentName$Frequency)
+per1 <- as.data.frame(round((myTable.className.departamentName$Frequency/sum.all1) * 100 ) )
+
+myTable.className.departamentName2 <- cbind(myTable.className.departamentName, per1 )
+
+
+myTable.className.departamentName3 <- rename(myTable.className.departamentName2, c("round((myTable.className.departamentName$Frequency/sum.all1) * 100)"="Percentages"))
+
+heat.map.percentages1 <- ggplot(data = myTable.className.departamentName3, mapping = aes(x = `Departament Name`,
+                                                              y = `Class Name`,
+                                                              fill = Percentages )) + 
+  geom_tile(aes(fill = Percentages)) + 
+  theme_bw() + 
+  geom_text(aes(label = Percentages), size = 3, hjust = 1, vjust = 0,colour="white")  +
+  xlab(label = "Departament Name") +
+  ylab("Class Name") +
+  theme_economist() +
+  theme(legend.position = "right", 
+        legend.box = "right",
+        legend.key.size = unit(1, "cm"),
+        axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.title = element_text(size = 12),
+        legend.text = element_text(size = 9),
+        legend.title=element_text(face = "bold", size = 9))  +
+  scale_fill_gradient2(low = "white", mid = "#6dc3c4", high = "#a37aa5")
+
+```
+
+
+
+```{r ,echo=FALSE , message=FALSE , warning=FALSE}
+
+grid.arrange(heat.map.className.departamentName,heat.map.percentages1, ncol=2, clip=TRUE)
+
+```
+
+From the graphs we can see thet the biggest freaquency is between Knits and Tops and also between Dresses and Dresses. 
+
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+myTable.className.divisionName <- as.data.frame(table(data.full$Class.Name , data.full$Division.Name))
+colnames(myTable.className.divisionName) <- c("Class Name" , "Division Name" , "Frequency")
+
+heat.map.percentages2 <- ggplot(data = myTable.className.divisionName, mapping = aes(x = `Division Name`,
+                                                                                         y = `Class Name`,
+                                                                                         fill = Frequency )) + 
+  geom_tile(aes(fill = Frequency)) + 
+  theme_bw() + 
+  geom_text(aes(label = Frequency), size = 3, hjust = 1, vjust = 0,colour="white")  +
+  xlab(label = "Division Name") +
+  ylab("Class Name") +
+  theme_economist() +
+  theme(legend.position = "none", 
+        legend.box = "right",
+        legend.key.size = unit(1, "cm"),
+        axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.title = element_text(size = 12),
+        legend.text = element_text(size = 9),
+        legend.title=element_text(face = "bold", size = 9)) +
+  scale_fill_gradient2(low = "#d02edd", mid = "#199790", high = "#ff7260")
+
+
+sum.all2 <- sum(myTable.className.divisionName$Frequency)
+per2 <- as.data.frame(round((myTable.className.divisionName$Frequency/sum.all2) * 100 ) )
+myTable.className.divisionName1 <- cbind(myTable.className.divisionName, per2 )
+
+
+myTable.className.divisionName2 <- rename(myTable.className.divisionName1, c("round((myTable.className.divisionName$Frequency/sum.all2) * 100)"="Percentages"))
+
+
+heat.map.percentages3 <- ggplot(data = myTable.className.divisionName2, mapping = aes(x = `Division Name`,
+                                                                                     y = `Class Name`,
+                                                                                     fill = Percentages )) + 
+  geom_tile(aes(fill = Percentages)) + 
+  theme_bw() + 
+  geom_text(aes(label = Percentages), size = 3, hjust = 1, vjust = 0,colour="white")  +
+  xlab(label = "Division Name") +
+  ylab("Class Name") +
+  theme_economist() +
+  theme(legend.position = "right", 
+        legend.box = "right",
+        legend.key.size = unit(1, "cm"),
+        axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.title = element_text(size = 12),
+        legend.text = element_text(size = 9),
+        legend.title=element_text(face = "bold", size = 9)) +
+  scale_fill_gradient2(low = "#d02edd", mid = "#199790", high = "#a37aa5")
+
+
+grid.arrange(heat.map.percentages2, heat.map.percentages3,ncol=2)
+```
+ 
+We can see that the biggest heat is between Knits and General and Dresses and General. 
+
+# 4 - Text Analysis
+
+Our data base includes two columns that are represented as text. It was important to also look into that and create a text analysis. 
+
+We did a sentiment analysis to see which words were the most used in the reviews made by the customers. 
+
+From the table we can see that most used word is : love (with 8948 occurances).
+We also checked if the reviews included more positive or more negative sentences. 
+
+From the result we can see that it includes more negative words. 
+```{r ,echo=FALSE , message=FALSE , warning=FALSE}
+
+d2 <- readr::read_csv("Womens.csv")
+colnames(d2)[5] <- "review"
+d2 <- d2 %>% unnest_tokens(word, review)
+
+#fear
+nrcfear <- get_sentiments("nrc") %>% filter(sentiment == "fear")
+fear <- d2 %>% inner_join(nrcfear) %>% count(word, sort=T)
+negative <- as.data.frame(fear)
+
+# joy 
+
+nrcjoy <- get_sentiments("nrc") %>% filter(sentiment == "joy")
+joy <- d2 %>% inner_join(nrcjoy) %>% count(word, sort=T)
+joy
+
+# anger 
+
+nrcanger <- get_sentiments("nrc") %>% filter(sentiment == "anger")
+anger <- d2 %>% inner_join(nrcanger) %>% count(word, sort=T)
+
+d <- get_sentiments("bing") %>% 
+  count(sentiment)
+
+kable(d) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F) %>%
+  column_spec(1:2, bold = T) %>%
+  row_spec(0, color = "black") %>%
+  row_spec(1, bold = T, color = "white", background = "#D7261E") %>%
+  row_spec(2, bold = T, color = "white", background = "#26c350")
+
+
+
+```
+
+
+```{r ,echo=FALSE , message=FALSE , warning=FALSE}
+d2 %>% inner_join(get_sentiments("bing")) %>% count(word, sentiment, sort=T) %>% ungroup()
+data.full.positive.negative <- d2 %>% inner_join(get_sentiments("bing")) %>% count(word, sentiment, sort=T) %>% ungroup()
+
+
+data.full.positive.negative %>% group_by(sentiment) %>% 
+  top_n(15) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) + 
+  geom_col(show.legend = F) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(y = "Contribution to sentiment",x=NULL) + 
+  coord_flip() +
+  theme_economist() +
+  geom_text(position = "dodge" , aes(label=n), size = 4) +
+  theme(axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.ticks = element_blank(),
+        axis.title = element_text(size = 12))  
+```
+
+
+Positive Negative Count in Recomended IND 
+
+In our analysis we also wanted to check if more negative or possitive words were beeing used in the products that have been recomended or not. 
+
+From the graph we can see that the products that have been recomended have included more positive than negative sentiments.
+
+```{r,echo=FALSE , warning=FALSE , message=FALSE}
+
+d4 <- d2 %>%inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, `Recommended IND`, sort = TRUE) 
+d4 <- as.data.frame(d4)
+
+positive.negative.recomended <- ggplot(d4, aes(`Recommended IND`, n, fill =sentiment)) + 
+      geom_bar(width = 0.4, position='dodge', stat="identity") +
+  xlab("Not recomended products        Recomended products") +
+  ylab("Count")+
+  scale_x_continuous(breaks=c(0:1)) +
+  theme_economist() +
+  theme(legend.position="top",
+        legend.box = "horizontal",
+        axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.ticks = element_blank(),
+        axis.title = element_text(size = 12))  
+
+
+p7 <- positive.negative.recomended +scale_fill_manual(values = c("#ff3232","#66b266"))
+p7
+
+```
+
+Positive Negative Count in Rating
+
+Vey similar analysis was also conducted on the rating. As we can see products that were reighted with the highest mark had more positive words in their recomendation.
+
+```{r , echo=FALSE , message=FALSE , warning=FALSE}
+
+d5 <- d2 %>%inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, `Rating`, sort = TRUE) 
+d5 <- as.data.frame(d5)
+
+positive.negative.rating<- ggplot(d5, aes(`Rating`, n, fill =sentiment)) + 
+  geom_bar(width = 0.4, position='dodge', stat="identity") +
+  xlab("Rating") +
+  ylab("Count")+
+  scale_x_continuous(breaks=c(1:5)) +
+  theme_economist() +
+  theme(legend.position="top",
+        legend.box = "horizontal",
+        axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.ticks = element_blank(),
+        axis.title = element_text(size = 12))  
+
+
+p8 <- positive.negative.rating + scale_fill_manual(values = c("#a6003a","#59c3b1"))
+p8
+
+
+```
+
+Similar analysis was also coducted in case of products. The most favourite and positively rated product was Tops. 
+
+```{r , echo=FALSE , message=FALSE , warning=FALSE}
+d6 <- d2 %>%inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, `Department Name`, sort = TRUE) 
+d7 <- as.data.frame(d6)
+
+
+positive.negative.departament<- ggplot(d7, aes(`Department Name`, n, fill =sentiment)) + 
+  geom_bar(width = 0.4, position='dodge', stat="identity") +
+  xlab("Department Name") +
+  ylab("Count")+
+  theme_economist() +
+  theme(legend.position="top",
+        legend.box = "horizontal",
+        axis.title.x = element_text(face = "bold", size = 12) ,
+        axis.title.y = element_text(face = "bold", size = 12) ,
+        axis.ticks = element_blank(),
+        axis.title = element_text(size = 12))  
+
+
+p9 <- positive.negative.departament + scale_fill_manual(values = c("#f96161","#ffc100"))
+p9
+
+
+
+
+```
+
+4.2  - Sentiment Analysis 
+
+In this part we created 2 new variables that would show the length of the review and count of the words in the review. 
+
+Creation of a new varibales  Review length and Count words
+
+```{r , echo=FALSE  ,message=FALSE , warning=FALSE}
+Review.length <- (str_length(data.full$Review.Text))
+data.full2 <- cbind(data.full, Review.length)
+data.full2$Class.Name <- as.factor(data.full2$Class.Name)
+
+```
+
+In the next part we have changed text variables to numerical once. 
+Firstly we looked on the highlights of all the sentences. 
+As we can see in the opended html , positive values are marked as green and negative as red. 
+In many cases Review or Topic had more than one sentence for those cases values were averaged. 
+Values that we recived are polinearity values. 
+
+
+
+```{r, , echo=FALSE  , warning=FALSE , message=FALSE}
+
+#as.character(data.full2$Review.Text) %>% sentiment_by(by = NULL) %>% highlight()
+
+Review.Text.polarity.vector <- as.character(data.full2$Review.Text)
+
+
+Review.Text.polarity <- as.data.frame(sentiment(Review.Text.polarity.vector))
+
+
+Review.Text.polarity1 <- as.data.frame(aggregate( Review.Text.polarity$sentimen ~ Review.Text.polarity$element_id, Review.Text.polarity, mean ))
+
+data.full2["Review.Text.polarity"] <-Review.Text.polarity1$`Review.Text.polarity$sentimen`
+
+data.full4 <- data.full2
+
+```
+
+
+
+```{r  echo=FALSE , warning=FALSE , message=FALSE}
+#look at highlights of all of the sentences
+
+#as.character(data.full2$Title) %>% sentiment_by(by = NULL) %>% highlight()
+
+#make a mean by the group find values that are the same and make an average sentiment of them
+
+Title.polarity.vector <- as.character(data.full2$Title)
+
+
+Title.polarity <- as.data.frame(sentiment(Title.polarity.vector))
+
+
+
+Title.polarity1 <- as.data.frame(aggregate( Title.polarity$sentimen ~ Title.polarity$element_id, Title.polarity, mean ))
+
+
+data.full2["Title.polarity"] <- Title.polarity1$`Title.polarity$sentimen`
+
+
+data.full4 <- data.full2
+
+
+```
+
+#4.3 - Look into final variables 
+
+Coorelation Matrix
+
+```{r echo=FALSE , warning=FALSE , message=FALSE}
+dat4 <- data.full4 %>%
+  dplyr::select(Age , Rating , Clothing.ID , Review.length , Positive.Feedback.Count ,   Recommended.IND , Review.Text.polarity , Title.polarity )
+res <- cor(dat4)
+res2 <- as.matrix(round(res, 2))
+
+
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+corrplot(res2, method="color", col=col(200),
+         order="hclust",
+         addCoef.col = "black", # Add coefficient of correlation
+         tl.col="black", tl.srt=45, #Text label color and rotation
+         # Combine with significance
+          sig.level = 0.01, insig = "blank",
+         # hide correlation coefficient on the principal diagonal
+         diag=TRUE
+)
+
+
+```
+
+We can see coorelation between Review Text and Count words. 
+Coorleation is also noticable between Rating and Recomended ID , Rating and Title Polarity,  Review Text Polarity and Title Polarity.
+
+Variables like Clothing.Id which is assigned to an item randomly was excluded becouse it dosn't give any real impact. 
+
+It was also strange for us that variable Age had no coorelation with Review Text Polarity.
+
+Based on the results we decided to get rid of variables Rating, Clothing.ID,Age, Title,Review.Text. 
+
+
+```{r echo=FALSE , warning=FALSE , message=FALSE}
+
+data.full4 <-data.full4[-c(6)]
+
+
+```
+
+
+
+After that we have also changed the categorical variables to dummy variables so they can be used in our algoriths. 
+
+```{r echo=FALSE , warning=FALSE , message=FALSE}
+
+data.full5 <- data.full4 %>%
+  dummy.data.frame(names="Division.Name", sep="_")
+
+data.full6 <- data.full5 %>%
+  dummy.data.frame(names="Department.Name", sep="_")
+
+data.full.final <- data.full6 %>%
+  dummy.data.frame(names="Class.Name", sep="_")
+
+
+
+
+```
+
+
+```{r echo=FALSE , warning=FALSE , message=FALSE}
+data.full.final[,c("Clothing.ID","Age","Title","Review.Text","X")] <- list(NULL)
+
+data.full.final3 <- data.full.final
+
+colnames(data.full.final3) <- gsub(" ", "_",  colnames(data.full.final3))
+
+kable(head(data.full.final3) , caption = "Database")
+```
+
+# 5 - Algorithms 
+
+Last part of our raport is a focus on used algorithms. 
+We have decided to use : Neural Network , Classification Tree and Random Forrest. 
+
+Preperation of the algorithms.
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+
+set.seed(123456789)
+training_obs <- createDataPartition(data.full.final3[,"Recommended.IND"], 
+                                    p = 0.7, 
+                                    list = FALSE) 
+data.cloths.recomended.train <- data.full.final3[training_obs,]
+data.cloths.recomended.test  <- data.full.final3[-training_obs,]
+
+model.formula3 <- as.formula(Recommended.IND ~ Positive.Feedback.Count + 
+  Division.Name_General + Division.Name_General_Petite + 
+  Division.Name_Initmates + Department.Name_Bottoms + 
+  Department.Name_Dresses + Department.Name_Intimate + Department.Name_Jackets + Department.Name_Tops + Department.Name_Trend + Class.Name_Blouses + Class.Name_Casual_bottoms + 
+  Class.Name_Chemises + Class.Name_Dresses + Class.Name_Fine_gauge + 
+  Class.Name_Intimates + Class.Name_Jackets + Class.Name_Jeans + 
+  Class.Name_Knits + Class.Name_Layering + Class.Name_Legwear + 
+  Class.Name_Lounge + Class.Name_Outerwear + Class.Name_Pants + 
+  Class.Name_Shorts + Class.Name_Skirts + Class.Name_Sleep + 
+  Class.Name_Sweaters + Class.Name_Swim + Class.Name_Trend +  + Review.Text.polarity + Title.polarity   +Review.length)
+```
+
+
+#Neural Network 
+
+We have created few neurals networks and compared the results. In the raport we have included two neural networks and based on that we have choosen one for the final comparison of all models.
+
+First NN
+
+```{r echo=FALSE , warning=FALSE , message=FALSE}
+data.cloths.recomended.train2 <-
+  data.cloths.recomended.train[sample(1:nrow(data.cloths.recomended.train),
+                              replace = FALSE),]
+
+colnames(data.cloths.recomended.train2) <- gsub(" ", "_",  colnames(data.cloths.recomended.train2))
+data.cloths.recomended.train.mtx <- 
+  model.matrix(object = model.formula3, 
+               data   = data.cloths.recomended.train2)
+data.cloths.recomended.test.mtx <- 
+  model.matrix(object = model.formula3, 
+               data   = data.cloths.recomended.test)
+
+
+col_list <- 
+  paste(c(colnames(data.cloths.recomended.train.mtx[, -1])), collapse = "+")
+
+col_list <- paste(c("Recommended.IND ~ ", col_list), collapse = "")
+(model.formula3 <- formula(col_list))
+
+data.cloths.recomended.test2 <- data.cloths.recomended.test[,c(which(colnames(data.cloths.recomended.test)=="Recommended.IND"),which(colnames(data.cloths.recomended.test)!="Recommended.IND"))]
+temp_test1 <- data.cloths.recomended.test.mtx[,c("Positive.Feedback.Count","Division.Name_General", "Division.Name_General_Petite",
+  "Division.Name_Initmates", "Department.Name_Bottoms", 
+  "Department.Name_Dresses", "Department.Name_Intimate", "Department.Name_Jackets", "Department.Name_Tops", "Department.Name_Trend", "Class.Name_Blouses", "Class.Name_Casual_bottoms", 
+  "Class.Name_Chemises", "Class.Name_Dresses","Class.Name_Fine_gauge", 
+  "Class.Name_Intimates", "Class.Name_Jackets", "Class.Name_Jeans", 
+  "Class.Name_Knits", "Class.Name_Layering", "Class.Name_Legwear",
+  "Class.Name_Lounge", "Class.Name_Outerwear", "Class.Name_Pants",
+  "Class.Name_Shorts", "Class.Name_Skirts", "Class.Name_Sleep",
+  "Class.Name_Sweaters", "Class.Name_Swim", "Class.Name_Trend","Review.Text.polarity", "Title.polarity","Review.length")]
+
+nn.lekcje  <- 
+  neuralnet(model.formula3,
+            data = data.frame(data.cloths.recomended.train.mtx,
+                              Recommended.IND = as.numeric(data.cloths.recomended.train2[,"Recommended.IND"])),
+            linear.output = FALSE,
+            learningrate.limit = NULL,
+            learningrate.factor = list(minus = 0.5, plus = 1.2),
+            stepmax = 1e6,
+            algorithm = "rprop+")
+
+output <- neuralnet::compute(nn.lekcje ,temp_test1)
+
+prob.result5 <- as.data.frame(output)
+
+prob.result5 <- data.frame(prob.result5[,"net.result"]) 
+prob.result7 <- ifelse(prob.result5 > 0.4, 1, 0)
+
+
+c <- confusionMatrix(as.factor(prob.result7),
+                as.factor(data.cloths.recomended.test[,1]),
+                positive = "1",
+                dnn=c("predictions","actual"),
+                mode="prec_recall")
+c
+
+```
+
+
+We can see that our confusion matrix looks a bit strange. It only shows how good 1s were classified and how well 0s were classified.
+
+Our next step was to look into plots of Sensitivity and Specifity (ROC curve).
+
+ROC
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+##First Neural Network- no hidden layers 
+detach(package:neuralnet,unload = T)
+
+p0 <- prediction(prob.result7, data.cloths.recomended.test[,"Recommended.IND"])
+ 
+perf_AUC10=performance(p0,"auc") 
+AUC10= data.frame(perf_AUC10@y.values[[1]])
+
+perf_ROC_tree1 <- performance(p0, "tpr", "fpr")
+plot(perf_ROC_tree1, main="ROC plot for model 1")
+
+```
+
+As we can see from the plot the results of ROC curve are not the best , we want our curve results to be as much curved and close to the left top corner as possible.  
+
+
+Second NN
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+library(neuralnet)
+set.seed(123456789)
+data.cloths.recomended.test.mtx <- 
+  model.matrix(object = model.formula3, 
+               data   = data.cloths.recomended.test)
+
+temp_test2 <- data.cloths.recomended.test.mtx[,c("Positive.Feedback.Count","Division.Name_General", "Division.Name_General_Petite",
+  "Division.Name_Initmates", "Department.Name_Bottoms", 
+  "Department.Name_Dresses", "Department.Name_Intimate", "Department.Name_Jackets", "Department.Name_Tops", "Department.Name_Trend", "Class.Name_Blouses", "Class.Name_Casual_bottoms", 
+  "Class.Name_Chemises", "Class.Name_Dresses","Class.Name_Fine_gauge", 
+  "Class.Name_Intimates", "Class.Name_Jackets", "Class.Name_Jeans", 
+  "Class.Name_Knits", "Class.Name_Layering", "Class.Name_Legwear",
+  "Class.Name_Lounge", "Class.Name_Outerwear", "Class.Name_Pants",
+  "Class.Name_Shorts", "Class.Name_Skirts", "Class.Name_Sleep",
+  "Class.Name_Sweaters", "Class.Name_Swim", "Class.Name_Trend","Review.Text.polarity", "Title.polarity","Review.length")]
+
+nn.lekcje2  <- 
+  neuralnet(model.formula3,
+            data = data.frame(data.cloths.recomended.train.mtx,
+                              Recommended.IND = as.numeric(data.cloths.recomended.train2[,"Recommended.IND"])),
+            hidden = c(2, 3), # number of neurons in hidden layers
+            linear.output = FALSE, # T for regression, F for classification
+            learningrate.limit = NULL,
+            learningrate.factor = list(minus = 0.5, plus = 1.2),
+            algorithm = "rprop+")
+
+output2 <- neuralnet::compute(nn.lekcje2 ,temp_test2)
+prob.result <- as.data.frame(output2)
+prob.result <- data.frame(prob.result[,"net.result"]) 
+prob.result9 <- ifelse(prob.result > 0.4, 1, 0)
+
+
+d <- confusionMatrix(as.factor(prob.result9),
+                as.factor(data.cloths.recomended.test[,1]),
+                positive = "1",
+                dnn=c("predictions","actual"),
+                mode="prec_recall")
+
+
+d
+
+```
+
+
+We can see that our confusion matrix did quite a good job. Possitive classification has deffinetly much better results , than missclassification.
+
+Our next step was to look into plots of Sensitivity and Specifity (ROC curve). 
+
+ROC 
+
+```{r , echo=FALSE ,message=FALSE , warning=TRUE}
+
+detach(package:neuralnet,unload = T)
+
+ ##Last Neural Network -  with hidden layers : hidden = c(2, 3)
+ p09 <- prediction(prob.result9, data.cloths.recomended.test[,"Recommended.IND"])
+ 
+ perf_AUC11=performance(p09,"auc") 
+ AUC11=data.frame(perf_AUC11@y.values[[1]])
+ 
+ perf_ROC_tree2 <- performance(p09, "tpr", "fpr")
+plot(perf_ROC_tree2, main="ROC plot for model 2")
+
+
+```
+
+As we can see from the plot the results of ROC curve are quite good. 
+
+
+```{r , echo=FALSE ,message=FALSE , warning=TRUE}
+AUC.nn <- data.frame(AUC10 ,AUC11)
+AUC.nn 
+```
+
+
+As we can see from the results we got a better results from AUC 11 , second Neural Network model with  hidden layers. This model has also a better Accuracy. 
+
+#Classification TREES
+
+We are doing the first tree. 
+
+```{r echo=FALSE , warning=FALSE , message=FALSE}
+set.seed(123456789)
+
+data.full.final.tree <-  
+  rpart(model.formula3, # model formula
+        data = data.cloths.recomended.train, # data
+        method = "class")
+
+fancyRpartPlot(data.full.final.tree , main = "Classification Tree" , palettes = "YlOrRd" , type = 1)
+
+```
+
+
+ROC curve , Confusion Matrix , Accuracy ,  AUC 
+
+ROC 
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+ pred1 <- prediction(predict(data.full.final.tree, type = "prob")[, 2], data.cloths.recomended.train[,"Recommended.IND"])
+ 
+ perf_ROC_tree1 <- performance(pred1, "tpr", "fpr")
+ plot(perf_ROC_tree1, main="ROC plot for model 1 - no prunning")
+
+
+```
+The best moment of ROC curve is when the False positive is equal to 0.23.
+
+Confusion Matrix 
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+pred18 <- predict(data.full.final.tree, type="class")
+table(pred18)
+
+```
+
+
+Accuracy
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+perf_ROC_tree.no.pr.acc <- performance(pred1, "acc")
+pl2 <-plot(perf_ROC_tree.no.pr.acc, main="model 1 -  Accuracy")
+```
+
+From the plot we can see that the best accuracy would be with a cut off equal to 0.5.
+
+AUC 
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+perf_AUC6=performance(pred1,"auc") 
+AUC7=perf_AUC6@y.values[[1]]
+AUC7
+```
+
+To improve the first tree we will do pruning. Our decision on how big the tree should be will be  will be based on the argument cp. In the next step we make another classification tree with an option to see all possible cp values. Base on the column  xerror we are looking for the row with the lowest value , this row will represent number of splits that we want to do in our data set. From the results we can see that the best number of splits will be 30.
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+set.seed(123456789)
+data.full.final.tree.cp <- 
+  rpart(model.formula3, # model formula
+        data = data.cloths.recomended.train, # data
+        method = "class",
+        control = rpart.control(cp = 0))
+```
+
+
+Based on the plot the value of cp that we have choosen to do the prune plot is 0.0017 and maxdepth that we have used is 30.
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+plotcp(data.full.final.tree.cp)
+```
+
+Second Classification Tree
+
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+set.seed(123456789)
+data.full.final.tree.pruning <- 
+  rpart(model.formula3, # model formula
+        data = data.cloths.recomended.train, # data
+        method = "class",
+         control = rpart.control(cp = 0.0017, maxdepth = 16, minsplit = 100),
+        parms = list(split = 'information'))
+
+fancyRpartPlot(data.full.final.tree.pruning , main = "Prunned Classification Tree" , palettes = "OrRd" , type = 1)
+```
+
+ROC curve , Confusion Matrix , Accuracy ,  AUC 
+
+ROC
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+pred.tr.pred <- prediction(predict(data.full.final.tree.pruning, type = "prob")[, 2], data.cloths.recomended.train[,"Recommended.IND"])
+
+perf_ROC_tree2 <- performance(pred.tr.pred, "tpr", "fpr")
+pl1 <-plot(perf_ROC_tree2, main="ROC plot for model 2 - with prunning")
+
+```
+
+The best moment of ROC curve is when the False positive is equal to 0.23.
+
+Confusion Matrix 
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+pred19 <- predict(data.full.final.tree.pruning, type="class")
+table(pred19)
+
+```
+
+
+Accuracy 
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+perf_ROC_tree.acc <- performance(pred.tr.pred, "acc")
+pl2 <-plot(perf_ROC_tree.acc, main="model 2 - Accuracy")
+```
+
+From the plot we can see that the best accuracy would be with a cut off equal to 0.5. Accuracy of the prunned tree is more chaotic than accuracy of the first tree.
+
+AUC
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+perf_AUC8=performance(pred.tr.pred,"auc")
+AUC8=perf_AUC8@y.values[[1]]
+AUC8
+```
+
+In the next step we compare results of both models.
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+AUC.trees <- data.frame(AUC7,AUC8)
+
+AUC.trees 
+```
+
+
+After comparing two Classification Trees algorithms with prunning and without we can see that better AUC results are in case of AUC8 (tree with  pruning). This is the tree that we will choose from classification trees to our final comparison of all algorithms. 
+
+
+
+#Random Forest 
+
+The last algorithm that we have choosen is random forrest. 
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+model1 <- randomForest(as.factor(Recommended.IND) ~ ., data = data.cloths.recomended.train, importance = TRUE)
+plot(model1)
+```
+
+ROC curve , Confusion Matrix , Accuracy , OOB , AUC 
+
+ROC
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+library(ROCR)
+predictions2=as.vector(model1$votes[,2])
+pred2=prediction(predictions2,data.cloths.recomended.train[,"Recommended.IND"])
+
+ 
+perf_RO2C=performance(pred2,"tpr","fpr") #plot the actual ROC curve
+plot(perf_RO2C, main="ROC for model 1")
+```
+
+The best moment of ROC curve is when the False positive is equal to 0.2.
+
+Confusion Matrix
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+predTrainRF <- predict(model1, data.cloths.recomended.train, type = "class")
+tbRF1 <- table(predTrainRF, data.cloths.recomended.train[,"Recommended.IND"])  
+tbRF1
+
+```
+
+
+Accuracy 
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+predictions3=as.vector(model1$votes[,2])
+pred3=prediction(predictions3,data.cloths.recomended.train[,"Recommended.IND"])
+ 
+perf_ROC_tree2 <- performance(pred3, "acc")
+pl2.2 <-plot(perf_ROC_tree2, main="model1 - Accuracy")
+
+```
+
+From the plot we can see that the best accuracy would be with a cut off equal to 0.7.
+
+OOB
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+min.err1 <- min(model1$err.rate[, "OOB"])
+min.err1
+```
+
+We looked into OOB error , for later comparison between models.
+From the results we can see that OOB error is equal to 13.49%.
+
+
+AUC 
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+perf_AUC2=performance(pred2,"auc") #Calculate the AUC value
+AUC1=perf_AUC2@y.values[[1]]
+AUC1
+
+```
+
+
+We also looked into which variables were the most important once in the whole model.
+
+We can see that the most valuable variables are Review Text polarity and Title polarity. 
+
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+varImpPlot(model1,  
+           sort = T,
+           n.var=5,
+           main="Top 5 - Variable Importance")
+
+```
+
+
+
+In the next step we will try to improve our tree. To do that we want to find the best value of mtry. 
+The best value of mtry is equal to 5. 
+
+We will use mtry equal to 5 in our next model ,  but this time we will make number of trees smaller. 
+
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+model2 <- randomForest(as.factor(Recommended.IND) ~ ., data = data.cloths.recomended.train,
+                                   importance = TRUE,
+                                    ntree = 100,
+                                     mtry = 5)
+
+plot(model2)
+
+
+```
+
+ROC curve , Confusion Matrix , Accuracy , OOB , AUC 
+
+ROC
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+predictions1.rf=as.vector(model2$votes[,2])
+pred1.rf =prediction(predictions1.rf,data.cloths.recomended.train[,"Recommended.IND"])
+perf_ROC1=performance(pred1.rf,"tpr","fpr") #plot the actual ROC curve
+plot(perf_ROC1, main="ROC for model 2")
+
+```
+
+The best moment of ROC curve is when the False positive is equal to 0.1.
+
+Confusion Matrix 
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+predTrainRF2 <- predict(model2, data.cloths.recomended.train, type = "class")
+tbRF2 <- table(predTrainRF2, data.cloths.recomended.train[,"Recommended.IND"])  
+tbRF2
+
+
+```
+
+
+Accuracy
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+predictions1.rf=as.vector(model2$votes[,2])
+pred1.rf =prediction(predictions1.rf,data.cloths.recomended.train[,"Recommended.IND"])
+perf_ROC_tree.rf <- performance(pred1.rf, "acc")
+pl2 <-plot(perf_ROC_tree.rf, main="model 2 - Accuracy")
+
+```
+From the plot we can see that the best accuracy would be with a cut off equal to 0.6.
+
+
+
+OOB
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+min.err2 <- min(model2$err.rate[, "OOB"])
+min.err2
+```
+
+As we can see from the results changing the value of number of trees for 100 and making mtry equal to 5 didn't improve our results. Value of OOB greq to 13.68%.
+
+AUC 
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+
+predictions1.rf=as.vector(model2$votes[,2])
+pred1.rf =prediction(predictions1.rf,data.cloths.recomended.train[,"Recommended.IND"])
+
+perf_AUC2=performance(pred1.rf,"auc") #Calculate the AUC value
+AUC2=perf_AUC2@y.values[[1]]
+AUC2
+
+```
+
+
+
+We also looked into which variables were the most important once in the whole model. Variables in case of model 2 were the same as in model1. 
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+varImpPlot(model2,  
+           sort = T,
+           n.var=5,
+           main="Top 5 - Variable Importance")
+
+```
+
+
+
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+AUC.rf.min.err <- data.frame(AUC1, min.err1 , AUC2 , min.err2)
+AUC.rf.min.err
+
+```
+
+
+
+In case of Random Forrest we have decided to compare both of the models based on their AUC value and min error to choose the best model from the two completed. As we can see the best result from both models had model with AUC1 (first random forrest). From the results we can see that the first model has also a little bit smaller min error than the second model.
+
+
+#Summary 
+
+As the last step we comapred all of the results of AUC from the variables. From all of the models the best one is with the results AUC1. This model represents random forrest without prunning.
+
+
+```{r , echo=FALSE ,message=FALSE , warning=FALSE}
+AUC.fr <- data.frame(AUC11 ,AUC7, AUC1)
+AUC.fr
+
+```
+
+
+
